@@ -24,6 +24,8 @@ namespace server
             this.tcpListener = new TcpListener(IPAddress.Loopback, 3000); // Change to IPAddress. Any for internet wide Communication
             // Clients can connect on the localhost with 3000 port.
 
+            //change
+
             this.shopThread = new Thread(new ThreadStart(ListenForClients)); // wait for client connections
             this.shopThread.Start();
 
