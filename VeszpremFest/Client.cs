@@ -14,14 +14,15 @@ namespace server
         private TcpClient _socket;
         private Thread _clientThread;
         private int _userID; // 0 if not logged in
+        private string _userType;
 
-
-        public Client(TcpClient socket, Thread clientThread, int userid = 1)
+        public Client(TcpClient socket, Thread clientThread, int userid = 0, string usertype = "user")
         {
             this.socket = socket;
             this.clientThread = clientThread;
             this.clientThread.Start(socket);
             this.UserID = userid;
+            this.UserType = usertype;
         }
 
         public TcpClient socket
@@ -50,6 +51,19 @@ namespace server
             }
         }
 
+        public string UserType
+        {
+            get
+            {
+                return _userType;
+            }
+
+            set
+            {
+                _userType = value;
+            }
+        }
+
         public string Login(string username, string password)
         {
             Database db = new Database();
@@ -57,12 +71,13 @@ namespace server
 
             if (UserID == 0)
             {
-                DataTable user = db.selectQuery("SELECT * FROM Users WHERE Username = " + username + " AND Password = " + password + ";");
+                DataTable user = db.selectQuery("SELECT * FROM Users WHERE Username = '" + username + "' AND Password = '" + password + "';");
 
 
                 if (user.Rows.Count > 0)
                 {
                     UserID = Convert.ToInt32(user.Rows[0].Field<Int64>("UserID"));
+                    UserType = user.Rows[0].Field<string>("UserType");
                     return username + " sikeresen bejelentkezett!";
                 }
 
@@ -72,5 +87,16 @@ namespace server
                 return "Már korábban bejelentkezett!";
             }
         }
-    }
+        
+        public string showMenu()
+        {
+            MessageBuilder msgBuilder = new MessageBuilder();
+            if (UserID != 0 && UserType == "user")
+            {
+                return msgBuilder.mainMenuForUser();
+            }
+
+            return msgBuilder.mainMenuForClient();
+        }
+            }
 }

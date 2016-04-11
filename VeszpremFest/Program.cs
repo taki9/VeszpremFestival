@@ -146,43 +146,47 @@ namespace server
                         {
                             SendMessage(msgBuilder.performanceList(), kliens);
                         }
+                        else if (message.body.MESSAGE.Equals("2"))
+                        {
+                            SendMessage(msgBuilder.ordersList(kliens), kliens);
+                        }
+
                         else if (message.body.MESSAGE.Equals("3"))
                         {
-
+                            Console.WriteLine("Client disconnected!");
                             kliens.socket.Client.Shutdown(SocketShutdown.Send);
                             kliens.socket.Client.Close();
                             connectedClients--;
                             kliens.clientThread.Abort();
                             clientList.Remove(kliens);
-                            Console.WriteLine("Client disconnected!");
                             break;
                         }
+                        else if (message.body.MESSAGE.Equals(""))
+                        {
+                            SendMessage(kliens.showMenu(), kliens);
+                        }
                     } 
-                    else if (message.head.STATUS.Equals("COMMAND") && message.head.STATUSCODE.Equals("ORDERS"))
-                    {
-                        SendMessage(msgBuilder.ordersList(kliens), kliens);
+                    else if (message.head.STATUS.Equals("LOGIN")) {
+                        string[] userData = Regex.Split(message.body.MESSAGE, ",");
 
+                        SendMessage(kliens.Login(userData[0], userData[1]), kliens);
+                        SendMessage(msgBuilder.mainMenuForUser(), kliens);
                     }
                     else if (message.head.STATUS.Equals("ORDER"))
                     {
-                        
                         string[] orderString = Regex.Split(message.body.MESSAGE, ",");
-                        
+
                         if (kliens.UserID != 0)
                         {
 
                             Order order = new Order();
 
                             SendMessage(order.newOrder(orderString, kliens), kliens);
-                        } else
+                        }
+                        else
                         {
                             SendMessage("Először be kell jelentkeznie!", kliens);
                         }
-                    }
-                    else if (message.head.STATUS.Equals("LOGIN")) {
-                        string[] userData = Regex.Split(message.body.MESSAGE, ",");
-
-                        SendMessage(kliens.Login(userData[0], userData[1]), kliens);
                     }
                 }
             }
