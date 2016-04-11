@@ -1,11 +1,15 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace server
 {
-    class Performance
+    class Location
     {
         private string _name;
-        private DateTime _start;
+        private int _price;
 
         public string Name
         {
@@ -20,23 +24,17 @@ namespace server
             }
         }
 
-        public DateTime Start
+        public int Price
         {
             get
             {
-                return _start;
+                return _price;
             }
 
             set
             {
-                _start = value;
+                _price = value;
             }
-        }
-        
-        public Performance(string name, DateTime start)
-        {
-            this._name = name;
-            this._start = start;
         }
     }
 }

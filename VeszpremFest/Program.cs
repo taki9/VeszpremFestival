@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using Newtonsoft.Json;
 using System.Text.RegularExpressions;
+using System.Data.SQLite;
 
 namespace server
 {
@@ -17,19 +18,16 @@ namespace server
         private Thread shopThread;
         private List<Client> clientList = new List<Client>();
         private MessageBuilder msgBuilder = new MessageBuilder();
-        private Ticketservice ticketService = new Ticketservice();
+
+        // CONNECTION STRING
 
         private void startServer()
         {
             this.tcpListener = new TcpListener(IPAddress.Loopback, 3000); // Change to IPAddress. Any for internet wide Communication
             // Clients can connect on the localhost with 3000 port.
 
-            //change
-
             this.shopThread = new Thread(new ThreadStart(ListenForClients)); // wait for client connections
             this.shopThread.Start();
-
-            ticketService.dataRead();
         }
 
         private void ListenForClients()
@@ -73,7 +71,9 @@ namespace server
                 // olvas a klienstől ----- 
                 bytesRead = 0;
 
+                
                 Client kliens = Identify(tcpClient);
+
 
                 try
                 {
@@ -144,7 +144,7 @@ namespace server
                     {
                         if (message.body.MESSAGE.Equals("1"))
                         {
-                            SendMessage(msgBuilder.performanceList(ticketService.Performances), kliens);
+                            SendMessage(msgBuilder.performanceList(), kliens);
                         }
                         else if (message.body.MESSAGE.Equals("3"))
                         {
@@ -165,28 +165,24 @@ namespace server
                     }
                     else if (message.head.STATUS.Equals("ORDER"))
                     {
-                        string[] order = Regex.Split(message.body.MESSAGE, ",");
-
-                        Performance selectedPerf = ticketService.Performances.searchPerformanceByName(order[0]);
-
-                        if (selectedPerf != null)
+                        
+                        string[] orderString = Regex.Split(message.body.MESSAGE, ",");
+                        
+                        if (kliens.UserID != 0)
                         {
-                            Ticket selectedTick = selectedPerf.searchTicketByName(order[1]);
 
-                            if (selectedTick != null)
-                            {
-                                kliens.MyOrder.addItem(new OrderedItem(selectedPerf, selectedTick, Int32.Parse(order[2])));
-                                SendMessage("Sikeres rendelés.", kliens);
-                            }
-                            else
-                            {
-                                SendMessage("Nem létező jegy!", kliens);
-                            }
-                        }
-                        else
+                            Order order = new Order();
+
+                            SendMessage(order.newOrder(orderString, kliens), kliens);
+                        } else
                         {
-                            SendMessage("Nem létező előadás!", kliens);
+                            SendMessage("Először be kell jelentkeznie!", kliens);
                         }
+                    }
+                    else if (message.head.STATUS.Equals("LOGIN")) {
+                        string[] userData = Regex.Split(message.body.MESSAGE, ",");
+
+                        SendMessage(kliens.Login(userData[0], userData[1]), kliens);
                     }
                 }
             }

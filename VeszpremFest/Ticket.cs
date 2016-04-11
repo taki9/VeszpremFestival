@@ -8,7 +8,7 @@ namespace server
 {
     class Ticket
     {
-        string _name;
+        int event_id;
         int _price;
         string _currency;
 
@@ -38,22 +38,8 @@ namespace server
             }
         }
 
-        public string Name
+        public Ticket(int price, string currency = "Ft")
         {
-            get
-            {
-                return _name;
-            }
-
-            set
-            {
-                _name = value;
-            }
-        }
-
-        public Ticket(string name,  int price, string currency = "Ft")
-        {
-            this.Name = name;
             this.Price = price;
             this.Currency = currency;
         }

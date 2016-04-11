@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Net.Sockets;
 using System.Threading;
+using System.Data;
 
 namespace server
 {
@@ -12,15 +13,15 @@ namespace server
     {
         private TcpClient _socket;
         private Thread _clientThread;
-        private Order myOrder;
+        private int _userID; // 0 if not logged in
 
 
-        public Client(TcpClient socket, Thread clientThread)
+        public Client(TcpClient socket, Thread clientThread, int userid = 1)
         {
             this.socket = socket;
             this.clientThread = clientThread;
             this.clientThread.Start(socket);
-            this.MyOrder = new Order();
+            this.UserID = userid;
         }
 
         public TcpClient socket
@@ -35,16 +36,40 @@ namespace server
             get { return this._clientThread; }
         }
 
-        internal Order MyOrder
+
+        public int UserID
         {
             get
             {
-                return myOrder;
+                return _userID;
             }
 
             set
             {
-                myOrder = value;
+                _userID = value;
+            }
+        }
+
+        public string Login(string username, string password)
+        {
+            Database db = new Database();
+
+
+            if (UserID == 0)
+            {
+                DataTable user = db.selectQuery("SELECT * FROM Users WHERE Username = " + username + " AND Password = " + password + ";");
+
+
+                if (user.Rows.Count > 0)
+                {
+                    UserID = Convert.ToInt32(user.Rows[0].Field<Int64>("UserID"));
+                    return username + " sikeresen bejelentkezett!";
+                }
+
+                return "Sikertelen! Felhasználónév vagy jelszó nem megfelelő!";
+            } else
+            {
+                return "Már korábban bejelentkezett!";
             }
         }
     }

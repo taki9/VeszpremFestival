@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -33,43 +34,61 @@ namespace server
                 ">> Amount of connected clients: " + clientNum;
         }
 
-        public string performanceList(PerformanceStorage performs)
+        public string performanceList()
         {
             string tmp = "";
+            Database db = new Database();
 
-            for (int i = 0; i < performs.getNumOfPerformances(); i++)
+            DataTable events = db.selectQuery("SELECT * FROM Events INNER JOIN Performances On Perform_ID = PerformID INNER JOIN Locations On Location_ID = LocationID;");
+
+            if (events.Rows.Count > 0)
             {
-                Performance performance = performs.getPerformance(i);
+                tmp += "Rendezvények:\n";
+                tmp += "-------------\n\n";
 
-                tmp += "Előadás: " + performance.Name + "\n";
-                tmp += "Helye: " + performance.Location + "\n";
-                tmp += "Férőhely: " + performance.Seats + "\n";
-                tmp += "Ideje: " + performance.Date.ToString() + "\n";
-                tmp += "Jegyek:\n";
-                for (int j = 0; j < performance.getNumOfTickets(); j++)
+                foreach (DataRow row in events.Rows)
                 {
-                    tmp += "\t" + performance.getTicket(j).Name + "\n";
-                    tmp += "\tÁr: " + performance.getTicket(j).Price + " " + performance.getTicket(j).Currency + "\n";
+                    tmp += "Előadás: " + row.Field<string>("PerformName") + "\n";
+                    tmp += "Ideje: " + row.Field<string>("Start") + "\n";
+                    tmp += "Helye: " + row.Field<string>("LocationName") + "\n";
+                    tmp += "Szabad helyek: " + row.Field<Int64>("AvailSeats") + "\n";
+                    tmp += "\n";
                 }
+            } else
+            {
+                tmp += "Jelenleg nincs újabb koncert!";
             }
 
             return tmp;
         }
 
-        public string ordersList(Client client)
+        
+        public string ordersList(Client kliens)
         {
-            string tmp = "";
+            Database db = new Database();
 
-            foreach (OrderedItem item in client.MyOrder.OrderedItems)
+            DataTable myOrder = db.selectQuery("SELECT * FROM Tickets INNER JOIN Events On Event_ID = EventID INNER JOIN Performances On Perform_ID = PerformID INNER JOIN Locations On Location_ID = LocationID WHERE User_ID =" + kliens.UserID + ";");
+
+            string orderString = "";
+
+            if (myOrder.Rows.Count > 0)
             {
-                tmp += item.Performance.Name + "\n" +
-                    item.Performance.Location + "\n" +
-                    item.Performance.Date.ToString() + "\n" +
-                    "jegyek száma: " + item.Quantity + "\n";
+                orderString += "Az eddig leadott foglalásai, és azok állapota:\n";
+                orderString += "----------------------------------------------\n\n";
+           
+                foreach (DataRow row in myOrder.Rows)
+                {
+                    orderString += "Előadás: " + row.Field<string>("PerformName") + "\n";
+                    orderString += "Ideje: " + row.Field<string>("Start") + "\n";
+                    orderString += "Helye: " + row.Field<string>("LocationName") + "\n";
+                    orderString += "Jegyek száma: " + row.Field<Int64>("Quantity") + "\n";
+                    orderString += "\n";
+                }
+
+                return orderString;
             }
 
-            tmp += "\nÖsszesen: " + client.MyOrder.CountPayment() + " Ft\n";
-            return tmp;
+            return "Még nincs foglalása!";
         }
     }
 
