@@ -16,8 +16,13 @@ namespace server
 
         public string mainMenuForClient()
         {
+            return "Bejelentkezéshez a # jel után adja meg a felhasználói nevét és jelszavát vesszővel elválasztva.";
+        }
+
+        public string mainMenuForUser()
+        {
             return "1) Előadások listázása\n" +
-                "2) Foglalás\n" +
+                "2) Foglalásaim\n" +
                 "3) Kilépés\n";
         }
 
@@ -48,6 +53,7 @@ namespace server
 
                 foreach (DataRow row in events.Rows)
                 {
+                    tmp += "Sorszám: " + row.Field<Int64>("EventID") + "\n";
                     tmp += "Előadás: " + row.Field<string>("PerformName") + "\n";
                     tmp += "Ideje: " + row.Field<string>("Start") + "\n";
                     tmp += "Helye: " + row.Field<string>("LocationName") + "\n";
@@ -65,30 +71,36 @@ namespace server
         
         public string ordersList(Client kliens)
         {
-            Database db = new Database();
 
-            DataTable myOrder = db.selectQuery("SELECT * FROM Tickets INNER JOIN Events On Event_ID = EventID INNER JOIN Performances On Perform_ID = PerformID INNER JOIN Locations On Location_ID = LocationID WHERE User_ID =" + kliens.UserID + ";");
-
-            string orderString = "";
-
-            if (myOrder.Rows.Count > 0)
+            if (kliens.UserID != 0)
             {
-                orderString += "Az eddig leadott foglalásai, és azok állapota:\n";
-                orderString += "----------------------------------------------\n\n";
-           
-                foreach (DataRow row in myOrder.Rows)
+                Database db = new Database();
+
+                DataTable myOrder = db.selectQuery("SELECT * FROM Tickets INNER JOIN Events On Event_ID = EventID INNER JOIN Performances On Perform_ID = PerformID INNER JOIN Locations On Location_ID = LocationID WHERE User_ID =" + kliens.UserID + ";");
+
+                string orderString = "";
+
+                if (myOrder.Rows.Count > 0)
                 {
-                    orderString += "Előadás: " + row.Field<string>("PerformName") + "\n";
-                    orderString += "Ideje: " + row.Field<string>("Start") + "\n";
-                    orderString += "Helye: " + row.Field<string>("LocationName") + "\n";
-                    orderString += "Jegyek száma: " + row.Field<Int64>("Quantity") + "\n";
-                    orderString += "\n";
+                    orderString += "Az eddig leadott foglalásai, és azok állapota:\n";
+                    orderString += "----------------------------------------------\n\n";
+
+                    foreach (DataRow row in myOrder.Rows)
+                    {
+                        orderString += "Előadás: " + row.Field<string>("PerformName") + "\n";
+                        orderString += "Ideje: " + row.Field<string>("Start") + "\n";
+                        orderString += "Helye: " + row.Field<string>("LocationName") + "\n";
+                        orderString += "Jegyek száma: " + row.Field<Int64>("Quantity") + "\n";
+                        orderString += "\n";
+                    }
+
+                    return orderString;
                 }
 
-                return orderString;
+                return "Még nincs foglalása!";
             }
 
-            return "Még nincs foglalása!";
+            return "Nem vagy bejelentkezve! Kérlek előbb lépj be!";
         }
     }
 
