@@ -102,6 +102,95 @@ namespace server
 
             return "Nem vagy bejelentkezve! Kérlek előbb lépj be!";
         }
+
+
+        public string seatMap(int eventID)
+        {
+            Database db = new Database();
+
+            DataTable eventData = db.selectQuery("SELECT * FROM Events INNER JOIN Locations ON LocationID = Location_ID WHERE EventID = " + eventID + ";");
+            DataTable seats = db.selectQuery("SELECT * FROM Seats WHERE Event_ID = " + eventID + ";");
+
+            int rows = Convert.ToInt32(eventData.Rows[0].Field<Int64>("seatRow"));
+            int columns = Convert.ToInt32(eventData.Rows[0].Field<Int64>("seatColumn"));
+
+            char seatStatus = 'F';
+            char[,] seatMap = new char[rows, columns];
+
+            for (int i = 0; i < rows; i++)
+            {
+                for (int j = 0; j < columns; j++)
+                {
+                    seatMap[i, j] = 'F';
+                }
+            }
+
+            foreach (DataRow row in seats.Rows)
+            {
+
+                if (row.Field<Int64>("SeatStatus") == 1)
+                {
+                    seatStatus = 'R';
+                } else
+                {
+                    seatStatus = 'P';
+                }
+
+                seatMap[row.Field<Int64>("RowNumber") - 1, row.Field<Int64>("ColumnNumber") - 1] = seatStatus;
+            }
+
+
+            string seatMapString = "";
+
+
+            seatMapString += "Válasszon helye(ke)t a rendeléséhez!\n\nAz előadás térképe:\n\n";
+
+            seatMapString += "  |";
+
+            if (columns > 9)
+            {
+                int i = 0;
+                for (i = 0; i < 9; i++)
+                {
+                    seatMapString += " " + (i + 1) + " |";
+                }
+
+                for (; i < columns; i++)
+                {
+                    seatMapString += "" + (i + 1) + " |";
+                }
+            }
+            else
+            {
+                for (int i = 0; i < columns; i++)
+                {
+                    seatMapString += " |" + (i + 1);
+                }
+            }
+            seatMapString += "\n";
+
+            for (int i = 0; i < rows; i++)
+            {
+                if (i < 9)
+                {
+                    seatMapString += " " + (i + 1) + "|";
+                }
+                else
+                {
+                    seatMapString += (i + 1) + "|";
+                }
+
+                for (int j = 0; j < columns; j++)
+                {
+                    seatMapString += " " + seatMap[i, j] + " |";
+                }
+                seatMapString += "\n";
+            }
+
+            seatMapString += "\nF - szabad\nR - foglalt\nP - fizetett\n";
+
+            return seatMapString;
+        }
     }
 
 }
