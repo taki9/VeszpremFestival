@@ -15,6 +15,8 @@ namespace server
         private Thread _clientThread;
         private int _userID; // 0 if not logged in
         private string _userType;
+        private Order _aktOrder;
+        private Boolean _ticketOrder;
 
         public Client(TcpClient socket, Thread clientThread, int userid = 0, string usertype = "user")
         {
@@ -23,6 +25,7 @@ namespace server
             this.clientThread.Start(socket);
             this.UserID = userid;
             this.UserType = usertype;
+            this.TicketOrder = false;
         }
 
         public TcpClient socket
@@ -61,6 +64,32 @@ namespace server
             set
             {
                 _userType = value;
+            }
+        }
+
+        internal Order AktOrder
+        {
+            get
+            {
+                return _aktOrder;
+            }
+
+            set
+            {
+                _aktOrder = value;
+            }
+        }
+
+        public bool TicketOrder
+        {
+            get
+            {
+                return _ticketOrder;
+            }
+
+            set
+            {
+                _ticketOrder = value;
             }
         }
 

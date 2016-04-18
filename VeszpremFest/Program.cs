@@ -178,10 +178,17 @@ namespace server
 
                         if (kliens.UserID != 0)
                         {
+                            if (kliens.TicketOrder == false)
+                            {
+                                kliens.AktOrder = new Order(Convert.ToInt32(orderString[0]), Convert.ToInt32(orderString[1]));
 
-                            Order order = new Order();
-
-                            SendMessage(order.newOrder(orderString, kliens), kliens);
+                                SendMessage(kliens.AktOrder.newOrder(orderString, kliens), kliens);
+                                SendMessage(msgBuilder.seatMap(Convert.ToInt32(orderString[0])), kliens);
+                            }
+                            else
+                            {
+                                SendMessage(kliens.AktOrder.addTicket(orderString, kliens), kliens);
+                            }
                         }
                         else
                         {
