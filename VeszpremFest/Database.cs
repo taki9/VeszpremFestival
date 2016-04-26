@@ -14,7 +14,7 @@ namespace server
 
         public Database()
         {
-            database = new SQLiteConnection(@"Data Source=D:\Programming\VisualStudioProjects\VeszpremFest\database\database; Version=3; UseUTF16Encoding=True;");
+            database = new SQLiteConnection(@"Data Source=D:\School\Rendszerfejlesztés\Veszpremfest\VeszpremFestival\database\database; Version=3; UseUTF16Encoding=True;");
         }
 
 
