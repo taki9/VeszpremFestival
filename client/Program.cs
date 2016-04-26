@@ -51,6 +51,11 @@ namespace client
                 UTF8Encoding encoder = new UTF8Encoding();
                 string message = encoder.GetString(msg, 0, bytesRead);
 
+                if (message == "QUIT")
+                {
+                    Environment.Exit(0);
+                }
+
                 Console.WriteLine(message);
             }
         }
@@ -76,11 +81,6 @@ namespace client
 
             clientStream.Write(buffer, 0, buffer.Length);
             clientStream.Flush();
-
-            if (message != null && (message.head.STATUS.Equals("COMMAND") && message.head.STATUS.Equals("COMMAND") && message.body.MESSAGE.Equals("3")))
-            {
-                Environment.Exit(0);
-            }
         }
 
         static void Main(string[] args)

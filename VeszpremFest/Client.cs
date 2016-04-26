@@ -18,7 +18,7 @@ namespace server
         private Order _aktOrder;
         private Boolean _ticketOrder;
 
-        public Client(TcpClient socket, Thread clientThread, int userid = 0, string usertype = "user")
+        public Client(TcpClient socket, Thread clientThread, int userid = 0, string usertype = "client")
         {
             this.socket = socket;
             this.clientThread = clientThread;
@@ -93,6 +93,27 @@ namespace server
             }
         }
 
+        public string Register(string name, string username, string password)
+        {
+            Database db = new Database();
+
+            if (UserID == 0)
+            {
+                DataTable user = db.selectQuery("SELECT * FROM Users WHERE Username = '" + username + "';");
+
+                if (user.Rows.Count > 0)
+                {
+                    return "A megadott felhasználói név foglalt!";
+                }
+
+                db.executeQuery("INSERT INTO Users VALUES(null, " + username + ", " + password + ", " + name + ", user);");
+
+                return "Sikeresen regisztrált! Kérem lépjen be.";
+            }
+
+            return "Már korábban bejelentkezett!";
+        }
+
         public string Login(string username, string password)
         {
             Database db = new Database();
@@ -107,6 +128,7 @@ namespace server
                 {
                     UserID = Convert.ToInt32(user.Rows[0].Field<Int64>("UserID"));
                     UserType = user.Rows[0].Field<string>("UserType");
+
                     return username + " sikeresen bejelentkezett!";
                 }
 
@@ -116,13 +138,23 @@ namespace server
                 return "Már korábban bejelentkezett!";
             }
         }
-        
+
+        public string Logout()
+        {
+            UserID = 0;
+            UserType = "client";
+
+            return "Sikeresen kijelentkezett!";
+        }
+
         public string showMenu()
         {
             MessageBuilder msgBuilder = new MessageBuilder();
             if (UserID != 0 && UserType == "user")
             {
                 return msgBuilder.mainMenuForUser();
+            } else if(UserID != 0 && UserType == "admin") {
+                return msgBuilder.mainMenuForAdmin();
             }
 
             return msgBuilder.mainMenuForClient();

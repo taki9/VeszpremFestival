@@ -16,14 +16,31 @@ namespace server
 
         public string mainMenuForClient()
         {
-            return "Bejelentkezéshez a # jel után adja meg a felhasználói nevét és jelszavát vesszővel elválasztva.";
+            return "Bejelentkezéshez a # jel után adja meg a felhasználói nevét és jelszavát vesszővel elválasztva.\n\n" +
+                "Ha még nem regisztrált, akkor a .Név,Felhasználói név,Jelszó parancs megadásával tud\n" + 
+                "Példa: .Kiss Béla,bela,bela\n\n" +
+                "Menü:\n" +
+                "1) Előadások listázása\n" +
+                "2) Kilépés\n";
+        }
+
+        public string mainMenuForAdmin()
+        {
+            return "1) Előadások listázása\n" +
+                "2) Eladó felvétele\n" +
+                "3) Előadás hozzáadása\n" +
+                "4) Helyszín hozzáadása\n" +
+                "5) Esemény hozzáadása\n" +
+                "6) Kijelentkezés\n" +
+                "7) Kilépés\n";
         }
 
         public string mainMenuForUser()
         {
             return "1) Előadások listázása\n" +
                 "2) Foglalásaim\n" +
-                "3) Kilépés\n";
+                "3) Kijelentkezés\n" +
+                "4) Kilépés\n";
         }
 
         public string serverStart()
