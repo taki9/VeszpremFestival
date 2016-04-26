@@ -8,6 +8,7 @@ using System.Threading;
 using Newtonsoft.Json;
 using System.Text.RegularExpressions;
 using System.Data.SQLite;
+using System.Data;
 
 namespace server
 {
@@ -140,44 +141,50 @@ namespace server
 
                 if (message != null)
                 {
-                    if (message.head.STATUS.Equals("COMMAND") && message.head.STATUSCODE.Equals("MENU"))
+                    if (kliens.UserType == "user")
                     {
-                        if (message.body.MESSAGE.Equals("1"))
+                        if (message.head.STATUS.Equals("COMMAND") && message.head.STATUSCODE.Equals("MENU"))
                         {
-                            SendMessage(msgBuilder.performanceList(), kliens);
-                        }
-                        else if (message.body.MESSAGE.Equals("2"))
-                        {
-                            SendMessage(msgBuilder.ordersList(kliens), kliens);
-                        }
+                            if (message.body.MESSAGE.Equals("1"))
+                            {
+                                SendMessage(msgBuilder.performanceList(), kliens);
+                            }
+                            else if (message.body.MESSAGE.Equals("2"))
+                            {
+                                SendMessage(msgBuilder.ordersList(kliens), kliens);
+                            }
+                            else if (message.body.MESSAGE.Equals("3"))
+                            {
+                                SendMessage(kliens.Logout(), kliens);
+                            }
 
-                        else if (message.body.MESSAGE.Equals("3"))
-                        {
-                            Console.WriteLine("Client disconnected!");
-                            kliens.socket.Client.Shutdown(SocketShutdown.Send);
-                            kliens.socket.Client.Close();
-                            connectedClients--;
-                            kliens.clientThread.Abort();
-                            clientList.Remove(kliens);
-                            break;
+                            else if (message.body.MESSAGE.Equals("4"))
+                            {
+                                Console.WriteLine("Client disconnected!");
+                                SendMessage("QUIT", kliens);
+                                kliens.socket.Client.Shutdown(SocketShutdown.Send);
+                                kliens.socket.Client.Close();
+                                connectedClients--;
+                                kliens.clientThread.Abort();
+                                clientList.Remove(kliens);
+                                break;
+                            }
+                            else if (message.body.MESSAGE.Equals(""))
+                            {
+                                SendMessage(kliens.showMenu(), kliens);
+                            }
                         }
-                        else if (message.body.MESSAGE.Equals(""))
+                        else if (message.head.STATUS.Equals("LOGIN"))
                         {
-                            SendMessage(kliens.showMenu(), kliens);
+                            string[] userData = Regex.Split(message.body.MESSAGE, ",");
+
+                            SendMessage(kliens.Login(userData[0], userData[1]), kliens);
+                            SendMessage(msgBuilder.mainMenuForUser(), kliens);
                         }
-                    } 
-                    else if (message.head.STATUS.Equals("LOGIN")) {
-                        string[] userData = Regex.Split(message.body.MESSAGE, ",");
-
-                        SendMessage(kliens.Login(userData[0], userData[1]), kliens);
-                        SendMessage(msgBuilder.mainMenuForUser(), kliens);
-                    }
-                    else if (message.head.STATUS.Equals("ORDER"))
-                    {
-                        string[] orderString = Regex.Split(message.body.MESSAGE, ",");
-
-                        if (kliens.UserID != 0)
+                        else if (message.head.STATUS.Equals("ORDER"))
                         {
+                            string[] orderString = Regex.Split(message.body.MESSAGE, ",");
+
                             if (kliens.TicketOrder == false)
                             {
                                 kliens.AktOrder = new Order(Convert.ToInt32(orderString[0]), Convert.ToInt32(orderString[1]));
@@ -190,9 +197,185 @@ namespace server
                                 SendMessage(kliens.AktOrder.addTicket(orderString, kliens), kliens);
                             }
                         }
-                        else
+                    } else if (kliens.UserType == "admin")
+                    {
+                        if (message.head.STATUS.Equals("COMMAND") && message.head.STATUSCODE.Equals("MENU"))
                         {
-                            SendMessage("Először be kell jelentkeznie!", kliens);
+                            if (message.body.MESSAGE.Equals("1"))
+                            {
+                                SendMessage(msgBuilder.performanceList(), kliens);
+                            }
+                            else if (message.body.MESSAGE.Equals("2"))
+                            {
+                                SendMessage("Eladó felvételéhez adja meg a # karakter után a felhasználói nevét, jelszavát, nevét és hogy mióta dolgozik a cégnél.\nPélda: #seller,seller,Nagy Péter,2015-09-30", kliens);
+                            }
+                            else if (message.body.MESSAGE.Equals("3"))
+                            {
+                                SendMessage("Előadás felvételéhez adja meg a + karakter után az előadás nevét.\nPélda: +Linkin Park", kliens);
+                            }
+                            else if (message.body.MESSAGE.Equals("4"))
+                            {
+                                SendMessage("Helyszín felvételéhez adja meg a + karakter után a helyszín nevét, az ott vásárolható jegyek árát, a nézőtér sorainak és oszlopainak számát.\nPélda: +Színpad,3000,20,18", kliens);
+                            }
+                            else if (message.body.MESSAGE.Equals("5"))
+                            {
+                                SendMessage("Esemény felvételéhez adja meg a + karakter után az előadás és helyszín nevét.\nPélda: +Linkin Park,Színpad", kliens);
+                            }
+                            else if (message.body.MESSAGE.Equals("6"))
+                            {
+                                SendMessage(kliens.Logout(), kliens);
+                            }
+
+                            else if (message.body.MESSAGE.Equals("7"))
+                            {
+                                Console.WriteLine("Client disconnected!");
+                                SendMessage("QUIT", kliens);
+                                kliens.socket.Client.Shutdown(SocketShutdown.Send);
+                                kliens.socket.Client.Close();
+                                connectedClients--;
+                                kliens.clientThread.Abort();
+                                clientList.Remove(kliens);
+                                break;
+                            }
+                            else if (message.body.MESSAGE.Equals(""))
+                            {
+                                SendMessage(kliens.showMenu(), kliens);
+                            }
+                        }
+                        else if (message.head.STATUS.Equals("COMMAND") && message.head.STATUSCODE.Equals("NEWSELLER"))
+                        {
+                            string[] data = Regex.Split(message.body.MESSAGE, ",");
+
+                            Database db = new Database();
+
+                            DataTable seller = db.selectQuery("SELECT * FROM Users WHERE Username = '" + data[0] + "';");
+
+                            if (seller.Rows.Count > 0)
+                            {
+                                SendMessage("A megadott felhasználói név foglalt!", kliens);
+                            }
+                            else
+                            {
+                                db.executeQuery("INSERT INTO Users VALUES(null, " + data[0] + ", " + data[1] + ", " + data[2] + ", seller);");
+
+                                seller = db.selectQuery("SELECT * FROM Users WHERE Username = '" + data[0] + "';");
+                                int userID = seller.Rows[0].Field<Int32>("UserID");
+
+                                db.executeQuery("INSERT INTO Sellers VALUES(null, " + data[3] + ", " + userID + ");");
+
+                                SendMessage("Eladó sikeresen felvéve!\n", kliens);
+                            }
+                        }
+                        else if (message.head.STATUS.Equals("COMMAND") && message.head.STATUSCODE.Equals("NEWPERFORM"))
+                        {
+                            Database db = new Database();
+
+                            DataTable perform = db.selectQuery("SELECT * FROM Performances WHERE PerformName = '" + message.body.MESSAGE + "';");
+
+                            if (perform.Rows.Count > 0)
+                            {
+                                SendMessage("Az előadás már létezik!", kliens);
+                            }
+                            else
+                            {
+                                db.executeQuery("INSERT INTO Performances VALUES(null, " + message.body.MESSAGE + ");");
+
+                                SendMessage("Előadás sikeresen felvéve!\n", kliens);
+                            }
+                        }
+                        else if (message.head.STATUS.Equals("COMMAND") && message.head.STATUSCODE.Equals("NEWLOCATION"))
+                        {
+                            string[] data = Regex.Split(message.body.MESSAGE, ",");
+
+                            Database db = new Database();
+
+                            DataTable loc = db.selectQuery("SELECT * FROM Locations WHERE LocationName = '" + data[0] + "';");
+
+                            if (loc.Rows.Count > 0)
+                            {
+                                SendMessage("Ez a helyszín már szerepel!", kliens);
+                            }
+                            else
+                            {
+                                db.executeQuery("INSERT INTO Locations VALUES(null, " + data[0] + ", " + data[1] + ", " + data[2] + ", " + data[3] + ");");
+
+                                SendMessage("Helyszín sikeresen hozzáadva!\n", kliens);
+                            }
+                        }
+                        else if (message.head.STATUS.Equals("COMMAND") && message.head.STATUSCODE.Equals("NEWEVENT"))
+                        {
+                            string[] data = Regex.Split(message.body.MESSAGE, ",");
+
+                            Database db = new Database();
+
+                            DataTable ev = db.selectQuery("SELECT * FROM Events INNER JOIN Performances On Perform_ID = PerformID INNER JOIN Locations On Location_ID = LocationID WHERE PerformName = '" + data[0] + "'" + "AND LocationName = '" + data[1] + "';");
+
+                            if (ev.Rows.Count > 0)
+                            {
+                                SendMessage("Ez az esemény már szerepel!", kliens);
+                            }
+                            else
+                            {
+                                DataTable perform = db.selectQuery("SELECT * FROM Performances WHERE PerformName = '" + data[0] + "';");
+
+                                if (perform.Rows.Count == 0)
+                                {
+                                    SendMessage("Nem létező előadás!", kliens);
+                                }
+                                else
+                                {
+                                    DataTable loc = db.selectQuery("SELECT * FROM Locations WHERE LocationName = '" + data[1] + "';");
+
+                                    if (loc.Rows.Count == 0)
+                                    {
+                                        SendMessage("Nem létező helyszín!", kliens);
+                                    }
+                                    else
+                                    {
+                                        db.executeQuery("INSERT INTO Events VALUES(null, " + perform.Rows[0].Field<Int64>("PerformID") + ", " + loc.Rows[0].Field<Int64>("LocationID") + ", " + data[3] + ", " + (loc.Rows[0].Field<Int64>("seatRow") * loc.Rows[0].Field<Int64>("seatColumn")) + ");");
+                                        SendMessage("Esemény sikeresen hozzáadva!", kliens);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (message.head.STATUS.Equals("COMMAND") && message.head.STATUSCODE.Equals("MENU"))
+                        {
+                            if (message.body.MESSAGE.Equals("1"))
+                            {
+                                SendMessage(msgBuilder.performanceList(), kliens);
+                            }
+                            else if (message.body.MESSAGE.Equals("2"))
+                            {
+                                Console.WriteLine("Client disconnected!");
+                                SendMessage("QUIT", kliens);
+                                kliens.socket.Client.Shutdown(SocketShutdown.Send);
+                                kliens.socket.Client.Close();
+                                connectedClients--;
+                                kliens.clientThread.Abort();
+                                clientList.Remove(kliens);
+                                break;
+                            }
+                            else if (message.body.MESSAGE.Equals(""))
+                            {
+                                SendMessage(kliens.showMenu(), kliens);
+                            }
+                        }
+
+                        if (message.head.STATUS.Equals("LOGIN"))
+                        {
+                            string[] userData = Regex.Split(message.body.MESSAGE, ",");
+
+                            SendMessage(kliens.Login(userData[0], userData[1]), kliens);
+                            SendMessage(kliens.showMenu(), kliens);
+                        }
+                        else if (message.head.Equals("REGISTER"))
+                        {
+                            string[] userData = Regex.Split(message.body.MESSAGE, ",");
+
+                            SendMessage(kliens.Register(userData[0], userData[1], userData[2]), kliens);
                         }
                     }
                 }
