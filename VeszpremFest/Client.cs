@@ -13,33 +13,35 @@ namespace server
     {
         private TcpClient _socket;
         private Thread _clientThread;
+
         private int _userID; // 0 if not logged in
+        private string _username;
         private string _userType;
-        private Order _aktOrder;
-        private Boolean _ticketOrder;
+
+        private OrderController _myOrder;
 
         public Client(TcpClient socket, Thread clientThread, int userid = 0, string usertype = "client")
         {
-            this.socket = socket;
-            this.clientThread = clientThread;
-            this.clientThread.Start(socket);
-            this.UserID = userid;
-            this.UserType = usertype;
-            this.TicketOrder = false;
+            Socket = socket;
+            ClientThread = clientThread;
+            ClientThread.Start(socket);
+            UserID = userid;
+            Username = "";
+            UserType = usertype;
+            MyOrder = new OrderController();
         }
 
-        public TcpClient socket
+        public TcpClient Socket
         {
             set { this._socket = value; }
             get { return this._socket; }
         }
 
-        public Thread clientThread
+        public Thread ClientThread
         {
             set { this._clientThread = value; }
             get { return this._clientThread; }
         }
-
 
         public int UserID
         {
@@ -67,67 +69,62 @@ namespace server
             }
         }
 
-        internal Order AktOrder
+        public string Username
         {
             get
             {
-                return _aktOrder;
+                return _username;
             }
 
             set
             {
-                _aktOrder = value;
+                _username = value;
             }
         }
 
-        public bool TicketOrder
+        internal OrderController MyOrder
         {
             get
             {
-                return _ticketOrder;
+                return _myOrder;
             }
 
             set
             {
-                _ticketOrder = value;
+                _myOrder = value;
             }
         }
 
-        public string Register(string name, string username, string password)
+        public string Register(string name, string username, string password, DbController dbc)
         {
-            Database db = new Database();
-
             if (UserID == 0)
             {
-                DataTable user = db.selectQuery("SELECT * FROM Users WHERE Username = '" + username + "';");
+                DataTable user = dbc.findUserByName(username);
 
                 if (user.Rows.Count > 0)
                 {
                     return "A megadott felhasználói név foglalt!";
                 }
 
-                db.executeQuery("INSERT INTO Users VALUES(null, " + username + ", " + password + ", " + name + ", user);");
+                dbc.registerUser(username, password, name);
 
                 return "Sikeresen regisztrált! Kérem lépjen be.";
             }
 
-            return "Már korábban bejelentkezett!";
+            return "Már bejelentkezett mint " + Username + "!";
         }
 
-        public string Login(string username, string password)
+        public string Login(string username, string password, DbController dbc)
         {
-            Database db = new Database();
-
-
             if (UserID == 0)
             {
-                DataTable user = db.selectQuery("SELECT * FROM Users WHERE Username = '" + username + "' AND Password = '" + password + "';");
-
+                DataTable user = dbc.userAuth(username, password);
 
                 if (user.Rows.Count > 0)
                 {
                     UserID = Convert.ToInt32(user.Rows[0].Field<Int64>("UserID"));
                     UserType = user.Rows[0].Field<string>("UserType");
+                    Username = user.Rows[0].Field<string>("Username");
 
                     return username + " sikeresen bejelentkezett!";
                 }
@@ -159,5 +156,11 @@ namespace server
 
             return msgBuilder.mainMenuForClient();
         }
-            }
+
+        public void Disconnect()
+        {
+            Socket.Client.Shutdown(SocketShutdown.Send);
+            Socket.Client.Close();
+        }
+    }
 }

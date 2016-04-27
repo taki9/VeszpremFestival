@@ -1,14 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using Newtonsoft.Json;
 using System.Text.RegularExpressions;
-using System.Data.SQLite;
 using System.Data;
+using System.Globalization;
 
 namespace server
 {
@@ -20,15 +19,20 @@ namespace server
         private List<Client> clientList = new List<Client>();
         private MessageBuilder msgBuilder = new MessageBuilder();
 
-        // CONNECTION STRING
+        private DbController dbc = new DbController();
+        private EventController evc = new EventController();
+        private LocationController lc = new LocationController();
 
         private void startServer()
         {
             this.tcpListener = new TcpListener(IPAddress.Loopback, 3000); // Change to IPAddress. Any for internet wide Communication
-            // Clients can connect on the localhost with 3000 port.
+            // Clients can connect on localhost with 3000 port.
 
             this.shopThread = new Thread(new ThreadStart(ListenForClients)); // wait for client connections
             this.shopThread.Start();
+
+            evc.readEventsFromDb(dbc);
+            lc.readLocationsFromDb(dbc);
         }
 
         private void ListenForClients()
@@ -83,18 +87,12 @@ namespace server
                 }
                 catch (Exception ex)
                 {
-                    //a socket error has occured
-                    Console.WriteLine(ex.Message);
-                    break;
-                }
-
-                if (bytesRead == 0)
-                {
                     connectedClients--;
-                    kliens.clientThread.Abort();
+                    Console.WriteLine("Client disconnected! Number of clients: " + connectedClients);
+                    kliens.Disconnect();
                     clientList.Remove(kliens);
-                    Console.WriteLine("Client disconnected!");
                     break;
+                    //a socket error has occured
                 }
 
                 //message has been successfully received
@@ -147,26 +145,24 @@ namespace server
                         {
                             if (message.body.MESSAGE.Equals("1"))
                             {
-                                SendMessage(msgBuilder.performanceList(), kliens);
+                                SendMessage(msgBuilder.eventList(evc), kliens);
                             }
                             else if (message.body.MESSAGE.Equals("2"))
                             {
-                                SendMessage(msgBuilder.ordersList(kliens), kliens);
+                                SendMessage(msgBuilder.newOrder(), kliens);
                             }
                             else if (message.body.MESSAGE.Equals("3"))
+                            {
+                                SendMessage(msgBuilder.ordersList(kliens), kliens);
+                            }
+                            else if (message.body.MESSAGE.Equals("4"))
                             {
                                 SendMessage(kliens.Logout(), kliens);
                             }
 
-                            else if (message.body.MESSAGE.Equals("4"))
+                            else if (message.body.MESSAGE.Equals("5"))
                             {
-                                Console.WriteLine("Client disconnected!");
-                                SendMessage("QUIT", kliens);
-                                kliens.socket.Client.Shutdown(SocketShutdown.Send);
-                                kliens.socket.Client.Close();
-                                connectedClients--;
-                                kliens.clientThread.Abort();
-                                clientList.Remove(kliens);
+                                DisconnectClient(kliens);
                                 break;
                             }
                             else if (message.body.MESSAGE.Equals(""))
@@ -178,23 +174,51 @@ namespace server
                         {
                             string[] userData = Regex.Split(message.body.MESSAGE, ",");
 
-                            SendMessage(kliens.Login(userData[0], userData[1]), kliens);
-                            SendMessage(msgBuilder.mainMenuForUser(), kliens);
+                            SendMessage("Már korábban bejelentkezett, mint " + kliens.Username, kliens);
+                        }
+                        else if (message.head.STATUS.Equals("SEATMAP"))
+                        {
+                            SendMessage(msgBuilder.seatMap(Convert.ToInt32(message.body.MESSAGE)), kliens);
                         }
                         else if (message.head.STATUS.Equals("ORDER"))
                         {
                             string[] orderString = Regex.Split(message.body.MESSAGE, ",");
 
-                            if (kliens.TicketOrder == false)
-                            {
-                                kliens.AktOrder = new Order(Convert.ToInt32(orderString[0]), Convert.ToInt32(orderString[1]));
+                            Event ev = evc.getEventByID(Convert.ToInt32(orderString[0]));
 
-                                SendMessage(kliens.AktOrder.newOrder(orderString, kliens), kliens);
-                                SendMessage(msgBuilder.seatMap(Convert.ToInt32(orderString[0])), kliens);
-                            }
-                            else
+                            int row = Convert.ToInt32(orderString[1]);
+                            int column = Convert.ToInt32(orderString[2]);
+
+                            if (ev != null)
                             {
-                                SendMessage(kliens.AktOrder.addTicket(orderString, kliens), kliens);
+                                if (row <= ev.Location.SeatRow && column <= ev.Location.SeatColumn)
+                                {
+                                    if (dbc.reserveSeat(ev.Id, row, column, kliens.UserID))
+                                    {
+                                        Order order = new Order(ev.PerformName, ev.Location.Name, ev.Start);
+                                        order.addSeat(new Seat(row, column));
+
+                                        if (kliens.MyOrder.newOrder(order) == false)
+                                        {
+                                            // KLIENS DIDNT ORDERED FOR THIS EVENT BEFORE
+                                            dbc.newOrder(ev.Id, kliens.UserID);
+                                        }
+                                        
+                                        ev.AvailSeats -= 1;
+
+                                        SendMessage("Sikeresen foglalt jegyet a(z) " + ev.PerformName + " eseményre!", kliens);
+                                    } else
+                                    {
+                                        SendMessage("A kiválasztott hely már foglalt.", kliens);
+                                    }
+                                }
+                                else
+                                {
+                                    SendMessage("A megadott hely nem létezik erre az előadásra!", kliens);
+                                }
+                            } else
+                            {
+                                SendMessage("Nincs ilyen esemény!", kliens);
                             }
                         }
                     } else if (kliens.UserType == "admin")
@@ -203,7 +227,7 @@ namespace server
                         {
                             if (message.body.MESSAGE.Equals("1"))
                             {
-                                SendMessage(msgBuilder.performanceList(), kliens);
+                                SendMessage(msgBuilder.eventList(evc), kliens);
                             }
                             else if (message.body.MESSAGE.Equals("2"))
                             {
@@ -211,30 +235,20 @@ namespace server
                             }
                             else if (message.body.MESSAGE.Equals("3"))
                             {
-                                SendMessage("Előadás felvételéhez adja meg a + karakter után az előadás nevét.\nPélda: +Linkin Park", kliens);
+                                SendMessage("Helyszín felvételéhez adja meg a + karakter után a helyszín nevét, az ott vásárolható jegyek árát, a nézőtér sorainak és oszlopainak számát.\nPélda: +Színpad,3000,20,18", kliens);
                             }
                             else if (message.body.MESSAGE.Equals("4"))
                             {
-                                SendMessage("Helyszín felvételéhez adja meg a + karakter után a helyszín nevét, az ott vásárolható jegyek árát, a nézőtér sorainak és oszlopainak számát.\nPélda: +Színpad,3000,20,18", kliens);
+                                SendMessage("Esemény felvételéhez adja meg a + karakter után az előadás és helyszín nevét, az esemény időpontját.\nPélda: +Linkin Park,Színpad,2016-05-04 21:00", kliens);
                             }
                             else if (message.body.MESSAGE.Equals("5"))
-                            {
-                                SendMessage("Esemény felvételéhez adja meg a + karakter után az előadás és helyszín nevét.\nPélda: +Linkin Park,Színpad", kliens);
-                            }
-                            else if (message.body.MESSAGE.Equals("6"))
                             {
                                 SendMessage(kliens.Logout(), kliens);
                             }
 
-                            else if (message.body.MESSAGE.Equals("7"))
+                            else if (message.body.MESSAGE.Equals("6"))
                             {
-                                Console.WriteLine("Client disconnected!");
-                                SendMessage("QUIT", kliens);
-                                kliens.socket.Client.Shutdown(SocketShutdown.Send);
-                                kliens.socket.Client.Close();
-                                connectedClients--;
-                                kliens.clientThread.Abort();
-                                clientList.Remove(kliens);
+                                DisconnectClient(kliens);
                                 break;
                             }
                             else if (message.body.MESSAGE.Equals(""))
@@ -246,9 +260,7 @@ namespace server
                         {
                             string[] data = Regex.Split(message.body.MESSAGE, ",");
 
-                            Database db = new Database();
-
-                            DataTable seller = db.selectQuery("SELECT * FROM Users WHERE Username = '" + data[0] + "';");
+                            DataTable seller = dbc.findUserByName(data[0]);
 
                             if (seller.Rows.Count > 0)
                             {
@@ -256,48 +268,30 @@ namespace server
                             }
                             else
                             {
-                                db.executeQuery("INSERT INTO Users VALUES(null, " + data[0] + ", " + data[1] + ", " + data[2] + ", seller);");
+                                dbc.registerUser(data[0], data[1], data[2]);
 
-                                seller = db.selectQuery("SELECT * FROM Users WHERE Username = '" + data[0] + "';");
-                                int userID = seller.Rows[0].Field<Int32>("UserID");
+                                seller = dbc.findUserByName(data[0]);
+                                int userID = Convert.ToInt32(seller.Rows[0].Field<Int64>("UserID"));
 
-                                db.executeQuery("INSERT INTO Sellers VALUES(null, " + data[3] + ", " + userID + ");");
+                                dbc.registerSeller(data[3], userID);
 
                                 SendMessage("Eladó sikeresen felvéve!\n", kliens);
-                            }
-                        }
-                        else if (message.head.STATUS.Equals("COMMAND") && message.head.STATUSCODE.Equals("NEWPERFORM"))
-                        {
-                            Database db = new Database();
-
-                            DataTable perform = db.selectQuery("SELECT * FROM Performances WHERE PerformName = '" + message.body.MESSAGE + "';");
-
-                            if (perform.Rows.Count > 0)
-                            {
-                                SendMessage("Az előadás már létezik!", kliens);
-                            }
-                            else
-                            {
-                                db.executeQuery("INSERT INTO Performances VALUES(null, " + message.body.MESSAGE + ");");
-
-                                SendMessage("Előadás sikeresen felvéve!\n", kliens);
                             }
                         }
                         else if (message.head.STATUS.Equals("COMMAND") && message.head.STATUSCODE.Equals("NEWLOCATION"))
                         {
                             string[] data = Regex.Split(message.body.MESSAGE, ",");
 
-                            Database db = new Database();
+                            Location loc = lc.findLocationByName(data[0]);
 
-                            DataTable loc = db.selectQuery("SELECT * FROM Locations WHERE LocationName = '" + data[0] + "';");
-
-                            if (loc.Rows.Count > 0)
+                            if (loc != null)
                             {
                                 SendMessage("Ez a helyszín már szerepel!", kliens);
                             }
                             else
                             {
-                                db.executeQuery("INSERT INTO Locations VALUES(null, " + data[0] + ", " + data[1] + ", " + data[2] + ", " + data[3] + ");");
+                                lc.addLocation(new Location(lc.numOfLocations() + 1, data[0], Convert.ToInt32(data[1]), Convert.ToInt32(data[2]), Convert.ToInt32(data[3])));
+                                dbc.newLocation(data[0], data[1], data[2], data[3]);
 
                                 SendMessage("Helyszín sikeresen hozzáadva!\n", kliens);
                             }
@@ -306,35 +300,34 @@ namespace server
                         {
                             string[] data = Regex.Split(message.body.MESSAGE, ",");
 
-                            Database db = new Database();
+                            DataTable perform = dbc.findPerformByName(data[0]);
 
-                            DataTable ev = db.selectQuery("SELECT * FROM Events INNER JOIN Performances On Perform_ID = PerformID INNER JOIN Locations On Location_ID = LocationID WHERE PerformName = '" + data[0] + "'" + "AND LocationName = '" + data[1] + "';");
+                            if (perform.Rows.Count == 0)
+                            {
+                                dbc.newPerform(data[0]);
+                            }
 
-                            if (ev.Rows.Count > 0)
+                            Event ev = evc.findEvent(data[0], data[1], DateTime.ParseExact(data[2], "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture));
+
+                            if (ev != null)
                             {
                                 SendMessage("Ez az esemény már szerepel!", kliens);
                             }
                             else
                             {
-                                DataTable perform = db.selectQuery("SELECT * FROM Performances WHERE PerformName = '" + data[0] + "';");
+                                perform = dbc.findPerformByName(data[0]);
 
-                                if (perform.Rows.Count == 0)
+                                Location loc = lc.findLocationByName(data[1]);
+
+                                if (loc == null)
                                 {
-                                    SendMessage("Nem létező előadás!", kliens);
+                                    SendMessage("Nem létező helyszín!", kliens);
                                 }
                                 else
                                 {
-                                    DataTable loc = db.selectQuery("SELECT * FROM Locations WHERE LocationName = '" + data[1] + "';");
-
-                                    if (loc.Rows.Count == 0)
-                                    {
-                                        SendMessage("Nem létező helyszín!", kliens);
-                                    }
-                                    else
-                                    {
-                                        db.executeQuery("INSERT INTO Events VALUES(null, " + perform.Rows[0].Field<Int64>("PerformID") + ", " + loc.Rows[0].Field<Int64>("LocationID") + ", " + data[3] + ", " + (loc.Rows[0].Field<Int64>("seatRow") * loc.Rows[0].Field<Int64>("seatColumn")) + ");");
-                                        SendMessage("Esemény sikeresen hozzáadva!", kliens);
-                                    }
+                                    evc.addEvent(new Event(evc.numOfEvents() + 1, perform.Rows[0].Field<string>("PerformName"), loc, DateTime.ParseExact(data[2], "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), loc.SeatColumn * loc.SeatRow));
+                                    dbc.newEvent(Convert.ToInt32(perform.Rows[0].Field<Int64>("PerformID")), loc.Id, data[2], loc.SeatColumn * loc.SeatRow);
+                                    SendMessage("Esemény sikeresen hozzáadva!", kliens);
                                 }
                             }
                         }
@@ -345,17 +338,11 @@ namespace server
                         {
                             if (message.body.MESSAGE.Equals("1"))
                             {
-                                SendMessage(msgBuilder.performanceList(), kliens);
+                                SendMessage(msgBuilder.eventList(evc), kliens);
                             }
                             else if (message.body.MESSAGE.Equals("2"))
                             {
-                                Console.WriteLine("Client disconnected!");
-                                SendMessage("QUIT", kliens);
-                                kliens.socket.Client.Shutdown(SocketShutdown.Send);
-                                kliens.socket.Client.Close();
-                                connectedClients--;
-                                kliens.clientThread.Abort();
-                                clientList.Remove(kliens);
+                                DisconnectClient(kliens);
                                 break;
                             }
                             else if (message.body.MESSAGE.Equals(""))
@@ -368,14 +355,27 @@ namespace server
                         {
                             string[] userData = Regex.Split(message.body.MESSAGE, ",");
 
-                            SendMessage(kliens.Login(userData[0], userData[1]), kliens);
+                            bool newLogin = true;
+
+                            if (kliens.UserID != 0)
+                            {
+                                newLogin = false;
+                            }
+
+                            SendMessage(kliens.Login(userData[0], userData[1], dbc), kliens);
+
+                            if (newLogin && kliens.UserID != 0)
+                            {
+                                kliens.MyOrder.readOrdersFromDb(kliens.UserID, evc, dbc);
+                            }
+
                             SendMessage(kliens.showMenu(), kliens);
                         }
-                        else if (message.head.Equals("REGISTER"))
+                        else if (message.head.STATUS.Equals("REGISTER"))
                         {
                             string[] userData = Regex.Split(message.body.MESSAGE, ",");
 
-                            SendMessage(kliens.Register(userData[0], userData[1], userData[2]), kliens);
+                            SendMessage(kliens.Register(userData[0], userData[1], userData[2], dbc), kliens);
                         }
                     }
                 }
@@ -386,9 +386,9 @@ namespace server
         {
             foreach (Client kliens in clientList)
             {
-                if (kliens.socket == consignee.socket)
+                if (kliens.Socket == consignee.Socket)
                 {
-                    NetworkStream clientStream = consignee.socket.GetStream();
+                    NetworkStream clientStream = consignee.Socket.GetStream();
 
                     UTF8Encoding encoder = new UTF8Encoding();
                     byte[] buffer = encoder.GetBytes(msg);
@@ -403,12 +403,21 @@ namespace server
         {
             foreach (Client kliens in clientList)
             {
-                if (client == kliens.socket)
+                if (client == kliens.Socket)
                 {
                     return kliens;
                 }
             }
             return null;
+        }
+
+        private void DisconnectClient(Client kliens)
+        {
+            connectedClients--;
+            Console.WriteLine("Client disconnected! Number of clients: " + connectedClients);
+            SendMessage("QUIT", kliens);
+            kliens.Disconnect();
+            clientList.Remove(kliens);
         }
 
 

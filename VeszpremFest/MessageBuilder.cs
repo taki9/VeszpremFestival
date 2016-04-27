@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -28,19 +29,19 @@ namespace server
         {
             return "1) Előadások listázása\n" +
                 "2) Eladó felvétele\n" +
-                "3) Előadás hozzáadása\n" +
-                "4) Helyszín hozzáadása\n" +
-                "5) Esemény hozzáadása\n" +
-                "6) Kijelentkezés\n" +
-                "7) Kilépés\n";
+                "3) Helyszín hozzáadása\n" +
+                "4) Esemény hozzáadása\n" +
+                "5) Kijelentkezés\n" +
+                "6) Kilépés\n";
         }
 
         public string mainMenuForUser()
         {
             return "1) Előadások listázása\n" +
-                "2) Foglalásaim\n" +
-                "3) Kijelentkezés\n" +
-                "4) Kilépés\n";
+                "2) Új foglalás\n" +
+                "3) Foglalásaim\n" +
+                "4) Kijelentkezés\n" +
+                "5) Kilépés\n";
         }
 
         public string serverStart()
@@ -56,58 +57,68 @@ namespace server
                 ">> Amount of connected clients: " + clientNum;
         }
 
-        public string performanceList()
+        public string eventList(EventController evc)
         {
             string tmp = "";
-            Database db = new Database();
 
-            DataTable events = db.selectQuery("SELECT * FROM Events INNER JOIN Performances On Perform_ID = PerformID INNER JOIN Locations On Location_ID = LocationID;");
-
-            if (events.Rows.Count > 0)
+            if (evc.numOfEvents() > 0)
             {
                 tmp += "Rendezvények:\n";
                 tmp += "-------------\n\n";
-
-                foreach (DataRow row in events.Rows)
-                {
-                    tmp += "Sorszám: " + row.Field<Int64>("EventID") + "\n";
-                    tmp += "Előadás: " + row.Field<string>("PerformName") + "\n";
-                    tmp += "Ideje: " + row.Field<string>("Start") + "\n";
-                    tmp += "Helye: " + row.Field<string>("LocationName") + "\n";
-                    tmp += "Szabad helyek: " + row.Field<Int64>("AvailSeats") + "\n";
-                    tmp += "\n";
-                }
             } else
             {
                 tmp += "Jelenleg nincs újabb koncert!";
             }
 
+            for (int i = 0; i < evc.numOfEvents(); i++)
+            {
+                Event ev = evc.getEventByIndex(i);
+
+                tmp += "Sorszám: " + ev.Id + "\n";
+                tmp += "Előadás: " + ev.PerformName + "\n";
+                tmp += "Ideje: " + ev.Start.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + "\n";
+                tmp += "Helye: " + ev.Location.Name + "\n";
+                tmp += "Szabad helyek: " + ev.AvailSeats + "\n";
+                tmp += "\n";
+            }
+
             return tmp;
+        }
+
+        public string newOrder()
+        {
+            return "Új rendelés leadásához először az esemény azonosítója segítségével le kell kérned az ülőhelyek listáját az alábbi módon: ?azonosító.\n" +
+                "Válassza ki a kívánt szabad helyet, majd az alábbi paranccsal lefoglalhatja az: ?azonosító,sor,oszlop\n" +
+                "Példa: ?2,5,7 - 2-es azonosítójú eseményre foglal jegyet az 5. sor 7. székére";
         }
 
         
         public string ordersList(Client kliens)
         {
-
             if (kliens.UserID != 0)
             {
-                Database db = new Database();
-
-                DataTable myOrder = db.selectQuery("SELECT * FROM Tickets INNER JOIN Events On Event_ID = EventID INNER JOIN Performances On Perform_ID = PerformID INNER JOIN Locations On Location_ID = LocationID WHERE User_ID =" + kliens.UserID + ";");
-
                 string orderString = "";
 
-                if (myOrder.Rows.Count > 0)
+                if (kliens.MyOrder.numOfOrders() > 0)
                 {
-                    orderString += "Az eddig leadott foglalásai, és azok állapota:\n";
-                    orderString += "----------------------------------------------\n\n";
+                    orderString += "Az eddig leadott foglalásai, és azokhoz tartozó székrendelések:\n";
+                    orderString += "---------------------------------------------------------------\n\n";
 
-                    foreach (DataRow row in myOrder.Rows)
+                    for(int i = 0; i < kliens.MyOrder.numOfOrders(); i++)
                     {
-                        orderString += "Előadás: " + row.Field<string>("PerformName") + "\n";
-                        orderString += "Ideje: " + row.Field<string>("Start") + "\n";
-                        orderString += "Helye: " + row.Field<string>("LocationName") + "\n";
-                        orderString += "Jegyek száma: " + row.Field<Int64>("Quantity") + "\n";
+                        Order ord = kliens.MyOrder.getOrder(i);
+
+                        orderString += "Előadás: " + ord.Perform + "\n";
+                        orderString += "Ideje: " + ord.Start + "\n";
+                        orderString += "Helye: " + ord.Loc + "\n";
+                        orderString += "Székek:\n";
+
+                        for (int j = 0; j < ord.numOfSeats(); j++)
+                        {
+                            Seat seat = ord.getSeat(j);
+                            orderString += "\t" + seat.RowNumber + ". sor " + seat.ColumnNumber + ". oszlop: " + seat.SeatStatus + "\n";
+                        }
+
                         orderString += "\n";
                     }
 

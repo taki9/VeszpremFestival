@@ -40,9 +40,7 @@ namespace client
 
                 string[] data = Regex.Split(msg, ",");
 
-                if (data.Length == 2) {
-                    message = new Message("ORDER", msg);
-                } else if (data.Length == 1)
+                if (data.Length == 1)
                 {
                     message = new Message("COMMAND", "NEWPERFORM", msg);
                 } else if (data.Length == 3)
@@ -57,6 +55,20 @@ namespace client
             {
                 msg = msg.Substring(1, msg.Length - 1);
                 message = new Message("REGISTER", msg);
+            } else if (msg.Substring(0,1) == "?")
+            {
+                msg = msg.Substring(1, msg.Length - 1);
+
+                string[] data = Regex.Split(msg, ",");
+
+                if (data.Length == 1)
+                {
+                    message = new Message("SEATMAP", msg);
+                }
+                else if (data.Length == 3)
+                {
+                    message = new Message("ORDER", msg);
+                }
             }
 
             return message;
