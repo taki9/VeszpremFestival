@@ -29,6 +29,7 @@ namespace server
             } catch(SQLiteException ex)
             {
 
+
             }
 
             database.Close();
