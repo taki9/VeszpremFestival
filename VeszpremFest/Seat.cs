@@ -12,13 +12,13 @@ namespace server
         private int _columnNumber;
         private string _seatStatus;
 
-        public Seat(int row, int column)
+        public Seat(int row, int column, string seatstatus = "foglalt")
         {
             RowNumber = row;
             ColumnNumber = column;
 
             // If you pay, set it to paid
-            SeatStatus = "foglalt";
+            SeatStatus = seatstatus;
         }
 
         public string SeatStatus

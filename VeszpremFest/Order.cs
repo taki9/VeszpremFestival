@@ -9,15 +9,18 @@ namespace server
         private string _perform;
         private string _loc;
         private DateTime _start;
+        private string _buyer;
 
         private List<Seat> _seats;
 
-        public Order(string perform, string loc, DateTime start)
+        public Order(string perform, string loc, DateTime start, string buyer)
         {
             Perform = perform;
             Loc = loc;
             Start = start;
+            Buyer = buyer;
             Seats = new List<Seat>();
+
         }
         
         public string Perform
@@ -72,6 +75,19 @@ namespace server
             }
         }
 
+        public string Buyer
+        {
+            get
+            {
+                return _buyer;
+            }
+
+            set
+            {
+                _buyer = value;
+            }
+        }
+
         public void addSeat(Seat seat)
         {
             Seats.Add(seat);
@@ -86,19 +102,23 @@ namespace server
         {
             return Seats[index];
         }
-        
-        //public int CountPayment()
-        //{
-        //    int sum = 0;
 
-        //    foreach (OrderedItem item in OrderedItems)
-        //    {
-        //        sum += item.Ticket.Price * item.Quantity;
-        //    }
+        public Seat getSeat(int row, int column)
+        {
+            int i = 0;
 
-        //    return sum;
-        //}
+            while (i < Seats.Count && !(Seats[i].RowNumber == row && Seats[i].ColumnNumber == column))
+            {
+                i++;
+            }
 
+            if (i < Seats.Count)
+            {
+                return Seats[i];
+            }
+
+            return null;
+        }
     }
 
 }

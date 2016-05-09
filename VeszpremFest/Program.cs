@@ -22,6 +22,7 @@ namespace server
         private DbController dbc = new DbController();
         private EventController evc = new EventController();
         private LocationController lc = new LocationController();
+        private OrderController oc = new OrderController();
 
         private void startServer()
         {
@@ -33,6 +34,7 @@ namespace server
 
             evc.readEventsFromDb(dbc);
             lc.readLocationsFromDb(dbc);
+            oc.readEveryOder(evc, dbc);
         }
 
         private void ListenForClients()
@@ -76,7 +78,7 @@ namespace server
                 // olvas a klienstől ----- 
                 bytesRead = 0;
 
-                
+
                 Client kliens = Identify(tcpClient);
 
 
@@ -96,12 +98,12 @@ namespace server
                 }
 
                 //message has been successfully received
-                
+
                 UTF8Encoding encoder = new UTF8Encoding();
 
                 // Convert the Bytes received to a string and display it on the Server Screen
                 string csomag = encoder.GetString(fromClient, 0, bytesRead);
-                
+
                 string json = null;
                 int jsonHossz = 0;
                 int x = 0, y = 0;
@@ -157,10 +159,13 @@ namespace server
                             }
                             else if (message.body.MESSAGE.Equals("4"))
                             {
+                                SendMessage(msgBuilder.payableList(kliens), kliens);
+                            }
+                            else if (message.body.MESSAGE.Equals("5"))
+                            {
                                 SendMessage(kliens.Logout(), kliens);
                             }
-
-                            else if (message.body.MESSAGE.Equals("5"))
+                            else if (message.body.MESSAGE.Equals("6"))
                             {
                                 DisconnectClient(kliens);
                                 break;
@@ -180,6 +185,12 @@ namespace server
                         {
                             SendMessage(msgBuilder.seatMap(Convert.ToInt32(message.body.MESSAGE)), kliens);
                         }
+                        else if (message.head.STATUS.Equals("PAY"))
+                        {
+                            string[] results = (message.body.MESSAGE).Split(new char[] { ',', ':' }, StringSplitOptions.RemoveEmptyEntries);
+
+                            SendMessage(msgBuilder.paymentList(results, dbc, oc, lc, kliens), kliens);
+                        }
                         else if (message.head.STATUS.Equals("ORDER"))
                         {
                             string[] orderString = Regex.Split(message.body.MESSAGE, ",");
@@ -195,7 +206,7 @@ namespace server
                                 {
                                     if (dbc.reserveSeat(ev.Id, row, column, kliens.UserID))
                                     {
-                                        Order order = new Order(ev.PerformName, ev.Location.Name, ev.Start);
+                                        Order order = new Order(ev.PerformName, ev.Location.Name, ev.Start, kliens.Username);
                                         order.addSeat(new Seat(row, column));
 
                                         if (kliens.MyOrder.newOrder(order) == false)
@@ -203,11 +214,13 @@ namespace server
                                             // KLIENS DIDNT ORDERED FOR THIS EVENT BEFORE
                                             dbc.newOrder(ev.Id, kliens.UserID);
                                         }
-                                        
+                                        oc.newOrder(order);
+
                                         ev.AvailSeats -= 1;
 
                                         SendMessage("Sikeresen foglalt jegyet a(z) " + ev.PerformName + " eseményre!", kliens);
-                                    } else
+                                    }
+                                    else
                                     {
                                         SendMessage("A kiválasztott hely már foglalt.", kliens);
                                     }
@@ -216,12 +229,14 @@ namespace server
                                 {
                                     SendMessage("A megadott hely nem létezik erre az előadásra!", kliens);
                                 }
-                            } else
+                            }
+                            else
                             {
                                 SendMessage("Nincs ilyen esemény!", kliens);
                             }
                         }
-                    } else if (kliens.UserType == "admin")
+                    }
+                    else if (kliens.UserType == "admin")
                     {
                         if (message.head.STATUS.Equals("COMMAND") && message.head.STATUSCODE.Equals("MENU"))
                         {
@@ -245,7 +260,6 @@ namespace server
                             {
                                 SendMessage(kliens.Logout(), kliens);
                             }
-
                             else if (message.body.MESSAGE.Equals("6"))
                             {
                                 DisconnectClient(kliens);
@@ -332,6 +346,43 @@ namespace server
                             }
                         }
                     }
+                    else if (kliens.UserType == "seller")
+                    {
+                        if (message.head.STATUS.Equals("COMMAND") && message.head.STATUSCODE.Equals("MENU"))
+                        {
+                            if (message.body.MESSAGE.Equals("1"))
+                            {
+                                SendMessage(msgBuilder.eventList(evc), kliens);
+                            }
+                            else if (message.body.MESSAGE.Equals("2"))
+                            {
+                                SendMessage(msgBuilder.verifyPayment(oc), kliens);
+                            }
+                            else if (message.body.MESSAGE.Equals("3"))
+                            {
+                                SendMessage(kliens.Logout(), kliens);
+                            }
+                            else if (message.body.MESSAGE.Equals("4"))
+                            {
+                                DisconnectClient(kliens);
+                                break;
+                            }
+                            else if (message.body.MESSAGE.Equals(""))
+                            {
+                                SendMessage(kliens.showMenu(), kliens);
+                            }
+                        } else if (message.head.STATUS.Equals("VERIFY"))
+                        {
+                            if (oc.verifyPayment(Convert.ToInt32(message.body.MESSAGE), dbc))
+                            {
+                                SendMessage("Sikeres hitelesítés!", kliens);
+                            }
+                            else
+                            {
+                                SendMessage("Sikertelen hitelesítés!", kliens);
+                            }
+                        }
+                    }
                     else
                     {
                         if (message.head.STATUS.Equals("COMMAND") && message.head.STATUSCODE.Equals("MENU"))
@@ -366,7 +417,7 @@ namespace server
 
                             if (newLogin && kliens.UserID != 0)
                             {
-                                kliens.MyOrder.readOrdersFromDb(kliens.UserID, evc, dbc);
+                                kliens.MyOrder.readOrdersFromDb(kliens.UserID, kliens.Username, evc, dbc);
                             }
 
                             SendMessage(kliens.showMenu(), kliens);

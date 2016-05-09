@@ -55,7 +55,8 @@ namespace client
             {
                 msg = msg.Substring(1, msg.Length - 1);
                 message = new Message("REGISTER", msg);
-            } else if (msg.Substring(0,1) == "?")
+            }
+            else if (msg.Substring(0,1) == "?")
             {
                 msg = msg.Substring(1, msg.Length - 1);
 
@@ -69,6 +70,18 @@ namespace client
                 {
                     message = new Message("ORDER", msg);
                 }
+            }
+            else if (msg.Substring(0,1) == "F")
+            {
+                msg = msg.Substring(1, msg.Length - 1);
+
+                message = new Message("PAY", msg);
+            }
+            else if (msg.Substring(0,1) == "H")
+            {
+                msg = msg.Substring(1, msg.Length - 1);
+
+                message = new Message("VERIFY", msg);
             }
 
             return message;
