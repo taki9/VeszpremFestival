@@ -31,6 +31,16 @@ namespace server
             return db.selectQuery("SELECT * FROM Tickets WHERE User_ID=" + userID + ";");
         }
 
+        public DataTable readOrders()
+        {
+            return db.selectQuery("SELECT * FROM Tickets INNER JOIN Users ON User_ID = UserID;");
+        }
+
+        public DataTable readSeatsForEvent(int eventID)
+        {
+            return db.selectQuery("SELECT * FROM Seats WHERE Event_ID=" + eventID + ";");
+        }
+
         public DataTable readSeatsForEvent(int eventID, int userID)
         {
             return db.selectQuery("SELECT * FROM Seats WHERE Event_ID=" + eventID + " AND User_ID=" + userID + ";");
@@ -93,6 +103,16 @@ namespace server
                 return true;
             }
             return false;
+        }
+
+        public void payTicket(int userID, int row, int column)
+        {
+            db.executeQuery("UPDATE Seats SET SeatStatus = 2 WHERE User_ID = " + userID + " AND RowNumber=" + row + " AND ColumnNumber=" + column + ";");
+        }
+
+        public void verifyPayment(string username, int row, int column)
+        {
+            db.executeQuery("UPDATE Seats SET SeatStatus = 3 WHERE User_ID IN(SELECT UserID FROM Users WHERE Username = '" +  username + "') AND RowNumber=" + row + " AND ColumnNumber=" + column + ";");
         }
     }
 }

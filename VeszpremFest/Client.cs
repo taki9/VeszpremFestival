@@ -150,8 +150,14 @@ namespace server
             if (UserID != 0 && UserType == "user")
             {
                 return msgBuilder.mainMenuForUser();
-            } else if(UserID != 0 && UserType == "admin") {
+            }
+            else if (UserID != 0 && UserType == "admin")
+            {
                 return msgBuilder.mainMenuForAdmin();
+            }
+            else if (UserID != 0 && UserType == "seller")
+            {
+                return msgBuilder.mainMenuForSeller();
             }
 
             return msgBuilder.mainMenuForClient();
